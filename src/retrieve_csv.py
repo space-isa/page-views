@@ -11,14 +11,14 @@ def retrive_csv_file(filename=None, input_folder=None):
     ARGUMENTS
     ---------
         filename : str
-            e.g., 'censustract_00_10.csv'
+            e.g., 'page-views.csv'
 
         input folder : str
 
     RETURNS
     -------
         csv_file : str
-            Full path to file, i.e., '.../input/censustract_00_10.csv'
+            Full path to file, i.e., '.../input/raw-data/page-views.csv'
     """
 
     if filename is not None:
@@ -30,7 +30,6 @@ def retrive_csv_file(filename=None, input_folder=None):
             csv_file = input_folder + filename
         else:
 
-            #  This is the input folder
             csv_file = filename
 
     #  No file name provided
