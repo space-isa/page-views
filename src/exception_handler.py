@@ -17,7 +17,7 @@ def exception_handler(function):
     """
     def wrapper(*args, **kwargs):
         try:
-            #  call the function
+            #  Call the function
             return function(*args, **kwargs)
 
         except FileNotFoundError as error:
