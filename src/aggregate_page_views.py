@@ -7,10 +7,52 @@
 # GitHub Take-Home Exam: Page Views
 # Due: 2021.05.12
 #------------------------------------------------------------------------------
+"""
+Accept an input csv file containing GitHub user page view data, and determine: 
+(it actually should output an aggregated data csv file with analytics for unique 
+queries. Can be used to then determine these very specific things, but it enables
+some flexibility...)
+
+1) The top 5 most frequently issued queries (include counts).
+2) The top 5 queries in terms of total number of results clicked (include counts).
+3) The average length of a search session.
+
+Write out the processed data and aggregated page view data into csv files.
+INPUTS
+------
+    Input file:
+        "page-views.csv"
+
+    Each row contains:
+        timestamp: The UNIX timestamp at time of page view [seconds]
+        path: The path of the page visited
+        referrer: The path that referred the user to the current page
+                  This is empty for the search page
+        cid: A client id that is unique to each user
+
+OUTPUTS
+-------
+    Output file:
+        "aggregated-page-views.csv"
+    
+    Contains:
+        Query keyword
+        Total number of results clicked
+        Total number of clients
+        Total time spent on query (seconds)
+        Average number of search clicks per client
+        Average time spent on search query per click
+
+"""
+
 #  Standard Python library imports
 import csv
 import sys
 import time
+from typing import List, Set, Dict, Tuple, Any
+import string
+from collections import Counter, OrderedDict
+from operator import getitem
 
 #   Companion scripts
 from exception_handler import exception_handler
@@ -18,36 +60,26 @@ from write_to_csv import write_to_csv
 from retrieve_csv import retrive_csv_file
 
 
-def extract_and_validate_data(csv_file, header=False,
-                              output_filename=None,
-                              output_folder=None):
+def validate_data(csv_file: str, 
+                  header: bool = False,
+                  output_filename: str = None,
+                  output_folder: str = None) -> List[List[str]]:
     """
     Pull data from csv and store as a list of lists. If any of the following 
     columns are missing data: timestamp, search path, or client id, then that 
     row will not be included in the final list.
-
-    ARGUMENTS
-    ---------
-        csv_file : str
-        output_filename : str
-
-    RETURNS
-    -------
-        page_views_lst : list
-            A list of lists 
     """
     page_views_lst = []
 
     # Initialize counter
     rows_read = 0
 
-    with open(csv_file, 'r') as data:
+    with open(csv_file, mode="r", encoding="utf-8") as data:
         read_data = csv.reader(data)
         for row in read_data:
             rows_read += 1
 
-            #  Will only skip rows with missing data
-            # NOTE: do we need to be that stringent?
+            #  Skip rows with missing data
             if row[0] != "" and row[1] != "" and row[3] != "":
                 page_views_lst.append(row)
 
@@ -59,12 +91,12 @@ def extract_and_validate_data(csv_file, header=False,
           """.format(rows_read, accepted, rejected)
           )
 
-    #  If no data can be pulled, write out empty report file and exit
+    #  If no data can be pulled, write out a failed report file and exit
     if len(page_views_lst) == 0:
-    
+
         datestamp = time.strftime("%Y%m%d")
         failed_report_folder = output_folder + "failed/" 
-        output_filename = "failed_report_{}".format(datestamp)
+        output_filename = "failed_no_valid_data_{}".format(datestamp)
 
         write_to_csv(output_filename=output_filename,
                      output_folder=failed_report_folder,
@@ -73,67 +105,215 @@ def extract_and_validate_data(csv_file, header=False,
         print("No valid data to pull. Exiting.")
         sys.exit(1)
 
+    if header:
+        return page_views_lst[1:]
+
     return page_views_lst
 
-def find_unique_queries(page_views_lst):
-    """extracted from column 1, following "=" """
 
-    # return: set of unique search terms
+def clean_query(path: str) -> str:
+    """Take a path and extract and clean query keyword."""
 
-    # we can put this in a frequency dict
-    terms = []
-    path_column = 1
+    punctuation = string.punctuation
+    if "search" in path:
+        term = path.split('=')[1]
+        term = term.lower()
+        #  remove any punctuations
+        term = term.translate(str.maketrans("", "", punctuation))
+        return term
+    else:
+        print("The path should contain a search key.")
 
-    for i in range(len(page_views_lst)):
-        path = page_views_lst[i][path_column]
-        if "search" in path:
-            term = path.split('=')[1]
-            terms.append(term)
 
-    unique_terms = set(terms)
+def find_unique_attributes(dataset: List[List[str]],
+                           column: int,
+                           path: bool = True) -> Tuple[List[str], List[str]]:
+    all_items = []
+    if path:
+        for i in range(len(dataset)):
+            path = dataset[i][column]
+            if "search" in path:
+                term = clean_query(path)
+                all_items.append(term)
+        unique_items = list(set(all_items))
+        unique_items.sort()
+    else:
+        for row in dataset:
+            all_items.append(row[column])
+            unique_items = list(set(all_items))
 
-    print(""" 
-          Out of {:,} total queries, there are {:,} unique query terms. 
-          """.format(len(terms), len(unique_terms))
-          )
+    return all_items, unique_items
 
-# def build_dictionary():
-#     # use unique queries as keys to build nested dict
-#     # arguments: data list, unique queries
-#     # return: dict
-#     pass 
 
-# def update_dictionary():
-#     # fill dictionary with aggregated data
-#     # arguments: 
-#     # returns: 
-#     pass
+def create_dictionary(dataset: List[List[str]],
+                      unique_terms: List[str]) -> Dict[str, Dict[str, Any]]:    
+    """Compile search data using query keyword and group by user client id."""
+    
+    my_dict = {query: {} for query in unique_terms}
+    
+    for i  in range(len(dataset)):
+        # path is an initial search 
+        if dataset[i][2] == "":
+            keyword = clean_query(dataset[i][1])
+            start_time = int(dataset[i][0])
+            cid = dataset[i][3]
+            clicks = 0
+            nested_dict = my_dict[keyword]
+            nested_dict[cid] = {}
+            nested_dict[cid]["start time"] = start_time
+            nested_dict[cid]["num search clicks"] = clicks
+            nested_dict[cid]["end times"] = []
+    
+        #  path referred by intial search
+        elif dataset[i][2] != "":
+            check_next = clean_query(dataset[i][2])
+            if keyword == check_next:
+                nested_dict[cid]["num search clicks"] += 1
+                end_time = int(dataset[i][0])
+                nested_dict[cid]["end times"].append(end_time)
+            else:
+                nested_dict[cid]["num search clicks"] += 1
+                end_time = int(dataset[i][0])
+                nested_dict[cid]["end times"].append(end_time)
+    
+    #  calculate total time 
+    for term in unique_terms:
+        for key, val in my_dict[term].items():
+            total_time = max(val["end times"]) - val["start time"]
+            val["total time"] = total_time
+    return my_dict
 
-# def aggregate_page_view_data():
-#     # where calculations are performed
-#     # arguments: 
-#     # returns: 
-#     pass 
 
-# def write_to_csv():
-#     pass
+def aggregated_dictionary(compiled_dict: Dict[str, Dict[str, Any]],
+                          unique_terms: List[str]) -> Dict[str, Dict[str, Any]]:
+    """Aggregate search query data and place into new dictionary."""
+
+    my_dict_agg = {query: { "results clicked": 0,
+                            "num users": 0,
+                            "total time": 0} 
+                            for query in unique_terms}
+    total_time_all = 0
+    total_clicks_all = 0
+
+    for term in unique_terms:
+        for key, val in compiled_dict[term].items():
+            if val and 'num search clicks' in val.keys():
+                num_clicks_sum = 0
+                total_time = 0
+                num_clicks_sum += val["num search clicks"]
+                num_users = len(compiled_dict[term])
+                total_time += val["total time"]
+                total_time_all += total_time
+                total_clicks_all += num_clicks_sum
+                my_dict_agg[term][
+                    "results clicked"] += num_clicks_sum  
+                my_dict_agg[term]["num users"] = num_users
+                my_dict_agg[term][
+                    "total time"] += total_time   
+                my_dict_agg[term][
+                    "av clicks per user"] = num_clicks_sum / num_users
+                my_dict_agg[term][
+                    "av time per click"] = total_time / num_clicks_sum
+
+    return my_dict_agg, total_time_all, total_clicks_all
+ 
+ 
+def write_data_to_csv(compiled_dict: Dict[str, Dict[str, Any]],
+                      output_folder: str):
+    """Pull data from aggregated dict and store in a csv."""
+
+    output = []
+
+    #  Order and sort data into output container
+    for key, val in compiled_dict.items():
+        output.append([key,
+                       val["total time"],
+                       val["num users"],
+                       val["results clicked"],
+                       val["av clicks per user"],
+                       val["av time per click"]])
+
+    output.sort(key=lambda header: header[0])
+    processed_folder = output_folder + 'processed-data/'
+    output_filename = 'aggregated-page-views.csv'
+    write_to_csv(output_filename=output_filename,
+                 output_folder=processed_folder,
+                 output=output)  
+
+def find_top_results(dictionary: Dict[str, Dict[str, Any]], 
+                     num_results: int, 
+                     result_key: str, 
+                     reverse: bool = True) -> List[Tuple[str, int]]:
+    """Create an ordered dictionary sorted by a user-defined key 
+    and return the top N results in descending order."""
+
+    most_freq_queries = []
+    result = OrderedDict(sorted(dictionary.items(), 
+                                key = lambda x: getitem(x[1], result_key), 
+                                reverse=reverse))
+    top_queries = list(result.keys())[:num_results]
+    for query in top_queries:
+        result_val = result[query][result_key]
+        most_freq_queries.append((query, result_val))   
+
+    return most_freq_queries
+
 
 @exception_handler
-def main(input_filename=None):
-    # pipeline 
+def main(input_filename: str = None):
+    """
+     Contains a pipeline that accepts an input csv file and processes the aggregate
+     data. Outputs processed data into a csv file and prints results of basic data
+     insight queries.
+
+    ARGUMENTS
+    ---------
+        input_filename : str
+            e.g., "page-views.csv"
+
+    RETURNS
+    -------
+        None 
+    """
+
     csv_file = retrive_csv_file(filename=input_filename,
                                 input_folder=input_folder)
-    page_views_lst = extract_and_validate_data(csv_file, header=False,
-                                                output_filename=None,
-                                                output_folder=None) 
-    find_unique_queries(page_views_lst) 
+    page_views_lst = validate_data(csv_file, 
+                                   header=False,
+                                   output_filename=None,
+                                   output_folder=None)
+    terms, unique_terms = find_unique_attributes(page_views_lst, 1)
+    print("Therea are {} unique search keywords out of {}.".format(len(unique_terms), len(terms))) 
+    cids, unique_cids = find_unique_attributes(page_views_lst, 3, path=False)
+    print("Therea are {} unique client ids out of {}.".format(len(unique_cids), len(cids))) 
+    my_dict =  create_dictionary(page_views_lst, unique_terms)
+    my_dict_agg, total_time_all, total_clicks_all = aggregated_dictionary(
+        my_dict, unique_terms)
+    write_data_to_csv(my_dict_agg, output_folder)
+
+    # Q1: find top issued queries
+    count_queries = Counter(terms)
+    top_queries = count_queries.most_common(num_issued_queries)
+    print("The top {} most issued queries are: {}".format(num_issued_queries, top_queries))
+
+    # Q2: find top queires by search result clicks
+    most_freq_queries = find_top_results(my_dict_agg, top_clicked, "results clicked")   
+    print("The top {} queries in terms of total number of search results clicked: {}".format(top_clicked, 
+        most_freq_queries))
+
+    # Q3: average length of a search session
+    average_search_session = total_time_all / total_clicks_all
+    print("The average length of a search session is {:.2f} seconds".format(
+        average_search_session))
+
 
 if __name__ == "__main__":
-
-    #  Specify relative input and output folder paths
     input_folder = "../input/raw-data/"
     output_folder = "../output/"
 
+    #  specify top N results to display
+    num_issued_queries = 5
+    top_clicked = 5
     # sys.argv[1]
     main(input_filename='page-views.csv')
 
