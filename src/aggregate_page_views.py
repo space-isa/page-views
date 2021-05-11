@@ -47,6 +47,7 @@ def extract_and_validate_data(csv_file, header=False,
             rows_read += 1
 
             #  Will only skip rows with missing data
+            # NOTE: do we need to be that stringent?
             if row[0] != "" and row[1] != "" and row[3] != "":
                 page_views_lst.append(row)
 
