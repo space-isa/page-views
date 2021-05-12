@@ -34,7 +34,7 @@ OUTPUTS
         "aggregated-page-views.csv"
 
     Contains:
-        Query keyword
+        Query search word
         Total number of results clicked
         Total number of clients
         Total time spent on query (seconds)
@@ -182,6 +182,7 @@ def create_dictionary(dataset: List[List[str]],
 
 
 def aggregated_dictionary(compiled_dict: Dict[str, Dict[str, Any]],
+                          freq_table: Dict[str, int],
                           unique_terms: List[str]) -> Dict[str, Dict[str, Any]]:
     """Aggregate search query data and place into new dictionary."""
 
@@ -197,6 +198,7 @@ def aggregated_dictionary(compiled_dict: Dict[str, Dict[str, Any]],
             if val and 'num search clicks' in val.keys():
                 num_clicks_sum = 0
                 total_time = 0
+                summary_table[term]["num queries"] = freq_table[term]
                 num_clicks_sum += val["num search clicks"]
                 num_users = len(compiled_dict[term])
                 total_time += val["total time"]
@@ -224,6 +226,7 @@ def write_data_to_csv(compiled_dict: Dict[str, Dict[str, Any]],
     #  Order and sort data into output container
     for key, val in compiled_dict.items():
         output.append([key,
+                       val["num queries"],
                        val["total time"],
                        val["num users"],
                        val["results clicked"],
@@ -284,18 +287,19 @@ def main(input_filename: str = None):
     terms, unique_terms = find_unique_attributes(page_views_data, 1)
     print("There are {} unique search keywords out of {}.".format(len(unique_terms), len(terms)))
     
+    count_queries = Counter(terms)
+
     cids, unique_cids = find_unique_attributes(page_views_data, 3, path=False)
     print("There are {} unique client ids out of {}.".format(len(unique_cids), len(cids)))
     
     query_table =  create_dictionary(page_views_data, unique_terms)
     
     summary_table, total_time_all, total_clicks_all = aggregated_dictionary(
-        query_table, unique_terms)
-    
+        query_table, count_queries, unique_terms)
+
     write_data_to_csv(summary_table, output_folder)
 
     #  Find top issued queries
-    count_queries = Counter(terms)
     top_queries = count_queries.most_common(N)
     print("The top {} most issued queries are: {}".format(N, top_queries))
 
