@@ -8,7 +8,8 @@
 # Due: 2021.05.12
 #------------------------------------------------------------------------------
 """
-Accept an input csv file containing GitHub user page view data, and determine:
+Accept an input csv file containing GitHub user page view data, and aggregates
+in order to be able to answer the following questions:
 
 1) The top 5 most frequently issued queries (include counts).
 2) The top 5 queries in terms of total number of results clicked (include counts).
@@ -35,9 +36,10 @@ OUTPUTS
 
     Contains:
         Query search word
-        Total number of results clicked
+        Total number of queries
+        Total time spent in a search session (seconds)
         Total number of clients
-        Total time spent on query (seconds)
+        Number of results clicked
         Average number of search clicks per client
         Average time spent on search query per click
 
@@ -47,10 +49,9 @@ OUTPUTS
 import csv
 import sys
 import time
-from typing import List, Set, Dict, Tuple, Any
+from typing import List, Dict, Tuple, Any
 import string
-from collections import Counter, OrderedDict
-from operator import getitem
+from collections import Counter
 
 #   Companion scripts
 from exception_handler import exception_handler
@@ -240,24 +241,6 @@ def write_data_to_csv(compiled_dict: Dict[str, Dict[str, Any]],
                  output_folder=processed_folder,
                  output=output)
 
-def find_top_results(dictionary: Dict[str, Dict[str, Any]],
-                     num_results: int,
-                     result_key: str,
-                     reverse: bool = True) -> List[Tuple[str, int]]:
-    """Create an ordered dictionary sorted by a user-defined key
-    and return the top N results in descending order."""
-
-    most_freq_queries = []
-    result = OrderedDict(sorted(dictionary.items(),
-                                key = lambda x: getitem(x[1], result_key),
-                                reverse=reverse))
-    top_queries = list(result.keys())[:num_results]
-    for query in top_queries:
-        result_val = result[query][result_key]
-        most_freq_queries.append((query, result_val))
-
-    return most_freq_queries
-
 
 @exception_handler
 def main(input_filename: str = None):
@@ -299,24 +282,8 @@ def main(input_filename: str = None):
 
     write_data_to_csv(summary_table, output_folder)
 
-    #  Find top issued queries
-    top_queries = count_queries.most_common(N)
-    print("The top {} most issued queries are: {}".format(N, top_queries))
-
-    #  Find top queires by search result clicks
-    most_freq_queries = find_top_results(summary_table, N, "results clicked")
-    print("The top {} queries in terms of total number of search results clicked: {}".format(N,
-        most_freq_queries))
-
-    #  Average length of a search session
-    average_search_session = total_time_all / total_clicks_all
-    print("The average length of a search session is {:.2f} seconds".format(
-        average_search_session))
-
 
 if __name__ == "__main__":
-    #  specify top results to display
-    N = 5
     input_folder = "../input/raw-data/"
     output_folder = "../output/"
 
