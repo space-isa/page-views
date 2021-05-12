@@ -22,9 +22,9 @@ def write_to_csv(output_filename=None,
         output_file = output_filename
     print(output_file)
 
-    #  Check if output file already exists.
+    #  check if output file already exists.
     if os.path.isfile(output_file):
-        print("Warning. This file already exists: {}".format(output_file))
+        print("This file already exists: {}".format(output_file))
         print("Overwriting.")
         with open(output_file, 'w') as output_data:
             writer = csv.writer(
@@ -37,7 +37,7 @@ def write_to_csv(output_filename=None,
             print("Check output folder for results.")
 
     else:
-        #  Write to output file
+        #  write to output file
         with open(output_file, 'w') as output_data:
             writer = csv.writer(
                 output_data,

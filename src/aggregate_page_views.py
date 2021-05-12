@@ -9,15 +9,13 @@
 #------------------------------------------------------------------------------
 """
 Accept an input csv file containing GitHub user page view data, and determine: 
-(it actually should output an aggregated data csv file with analytics for unique 
-queries. Can be used to then determine these very specific things, but it enables
-some flexibility...)
 
 1) The top 5 most frequently issued queries (include counts).
 2) The top 5 queries in terms of total number of results clicked (include counts).
 3) The average length of a search session.
 
-Write out the processed data and aggregated page view data into csv files.
+Write out the aggregated page view data into a csv file.
+
 INPUTS
 ------
     Input file:
@@ -176,7 +174,7 @@ def create_dictionary(dataset: List[List[str]],
                 end_time = int(dataset[i][0])
                 nested_dict[cid]["end times"].append(end_time)
     
-    #  calculate total time 
+    #  calculate time spent in a search session
     for term in unique_terms:
         for key, val in my_dict[term].items():
             total_time = max(val["end times"]) - val["start time"]
@@ -217,7 +215,7 @@ def aggregated_dictionary(compiled_dict: Dict[str, Dict[str, Any]],
 
     return my_dict_agg, total_time_all, total_clicks_all
  
- 
+
 def write_data_to_csv(compiled_dict: Dict[str, Dict[str, Any]],
                       output_folder: str):
     """Pull data from aggregated dict and store in a csv."""
@@ -278,15 +276,15 @@ def main(input_filename: str = None):
 
     csv_file = retrive_csv_file(filename=input_filename,
                                 input_folder=input_folder)
-    page_views_lst = validate_data(csv_file, 
+    page_views_data = validate_data(csv_file, 
                                    header=False,
                                    output_filename=None,
                                    output_folder=None)
-    terms, unique_terms = find_unique_attributes(page_views_lst, 1)
-    print("Therea are {} unique search keywords out of {}.".format(len(unique_terms), len(terms))) 
-    cids, unique_cids = find_unique_attributes(page_views_lst, 3, path=False)
-    print("Therea are {} unique client ids out of {}.".format(len(unique_cids), len(cids))) 
-    my_dict =  create_dictionary(page_views_lst, unique_terms)
+    terms, unique_terms = find_unique_attributes(page_views_data, 1)
+    print("There are {} unique search keywords out of {}.".format(len(unique_terms), len(terms))) 
+    cids, unique_cids = find_unique_attributes(page_views_data, 3, path=False)
+    print("There are {} unique client ids out of {}.".format(len(unique_cids), len(cids))) 
+    my_dict =  create_dictionary(page_views_data, unique_terms)
     my_dict_agg, total_time_all, total_clicks_all = aggregated_dictionary(
         my_dict, unique_terms)
     write_data_to_csv(my_dict_agg, output_folder)
@@ -311,7 +309,7 @@ if __name__ == "__main__":
     input_folder = "../input/raw-data/"
     output_folder = "../output/"
 
-    #  specify top N results to display
+    #  specify top results to display
     num_issued_queries = 5
     top_clicked = 5
     # sys.argv[1]
