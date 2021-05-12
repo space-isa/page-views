@@ -215,7 +215,7 @@ def aggregated_dictionary(compiled_dict: Dict[str, Dict[str, Any]],
                 summary_table[term][
                     "av time per click"] = total_time / num_clicks_sum
 
-    return summary_table, total_time_all, total_clicks_all
+    return summary_table
  
 
 def write_data_to_csv(compiled_dict: Dict[str, Dict[str, Any]],
@@ -277,8 +277,7 @@ def main(input_filename: str = None):
     
     query_table =  create_dictionary(page_views_data, unique_terms)
     
-    summary_table, total_time_all, total_clicks_all = aggregated_dictionary(
-        query_table, count_queries, unique_terms)
+    summary_table = aggregated_dictionary(query_table, count_queries, unique_terms)
 
     write_data_to_csv(summary_table, output_folder)
 
