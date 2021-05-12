@@ -73,11 +73,12 @@ Take in, clean, and process a log repository search requests on GitHub.com.
 - Write out aggregated search data into a csv ```aggregated-page-views.csv```.
 
 ```page_views_insights.py```
+- Define paths to input file.
 - Pull data from ```aggregated-page-views.csv```
-- Create a frequency table with click counts and query counts per query.
-- Calculate average search time.  
-- Report out answers to Q1-3.
-
+- Create a frequency table containing click counts and results counts per query.
+- Sort frequency table to find most frequent query and report top 5 (Q1).
+- Sort frequency table to find query with most results clicks and report top 5 (Q2).
+- Calculate average search time and report (Q3).  
 ---
 
 ## Requirements
