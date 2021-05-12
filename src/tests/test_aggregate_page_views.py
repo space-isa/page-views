@@ -14,7 +14,8 @@ class TestExtractionData(unittest.TestCase):
     Edge cases aggregating page view data from csv file.
     METHODS
     -------
-        test_emptyCSV : Given empty file, no data should be pulled and a failed report is generated.
+        test_emptyCSV : Given empty file, no data should be pulled and a failed report 
+                        is generated.
     """
 
     def test_emptyCSV(self,
@@ -35,12 +36,14 @@ class TestCleanData(unittest.TestCase):
     """
     METHODS
     -------
-        test_repeating_keywords : Ensure no duplicate codes are returned.
-        test_no_keywords_listed : Given an empty list of codes, return empty set.
+        test_clean_query : Ensure no duplicate search queries with different spellings
+                            returns the same search term.
+        test_find_unique_attributes : Ensure set of unique terms does not contain duplicates.
     """
 
     def test_clean_query(self):
-        """Ensure duplicate CBSA codes are not repeated."""
+        """Ensure the same queries containig different letter cases and punctuations
+         returns the same word (without punctuation and in lowercase)."""
 
         path_lower = '/search?q=geophysics'
         path_mixed = '/search?q=GeoPhysics!'
