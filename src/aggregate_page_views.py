@@ -94,14 +94,13 @@ def validate_data(csv_file: str,
 
         datestamp = time.strftime("%Y%m%d")
         failed_report_folder = output_folder + "failed/" 
-        output_filename = "failed_no_valid_data_{}".format(datestamp)
+        output_filename = "failed_no_valid_data_{}.csv".format(datestamp)
 
         write_to_csv(output_filename=output_filename,
                      output_folder=failed_report_folder,
                      output=page_views_lst)
 
-        print("No valid data to pull. Exiting.")
-        sys.exit(1)
+        print("No valid data to pull. Failed report generated.")
 
     if header:
         return page_views_lst[1:]
@@ -113,10 +112,10 @@ def clean_query(path: str) -> str:
     """Take a path and extract and clean query keyword."""
 
     punctuation = string.punctuation
+    #  Remove punctuation and return lowercase term
     if "search" in path:
         term = path.split('=')[1]
         term = term.lower()
-        #  remove any punctuations
         term = term.translate(str.maketrans("", "", punctuation))
         return term
     else:
@@ -147,22 +146,22 @@ def create_dictionary(dataset: List[List[str]],
                       unique_terms: List[str]) -> Dict[str, Dict[str, Any]]:    
     """Compile search data using query keyword and group by user client id."""
     
-    my_dict = {query: {} for query in unique_terms}
+    query_table = {query: {} for query in unique_terms}
     
     for i  in range(len(dataset)):
-        # path is an initial search 
+        #  Path is an initial search 
         if dataset[i][2] == "":
             keyword = clean_query(dataset[i][1])
             start_time = int(dataset[i][0])
             cid = dataset[i][3]
             clicks = 0
-            nested_dict = my_dict[keyword]
+            nested_dict = query_table[keyword]
             nested_dict[cid] = {}
             nested_dict[cid]["start time"] = start_time
             nested_dict[cid]["num search clicks"] = clicks
             nested_dict[cid]["end times"] = []
     
-        #  path referred by intial search
+        #  Path referred by intial search
         elif dataset[i][2] != "":
             check_next = clean_query(dataset[i][2])
             if keyword == check_next:
@@ -174,19 +173,19 @@ def create_dictionary(dataset: List[List[str]],
                 end_time = int(dataset[i][0])
                 nested_dict[cid]["end times"].append(end_time)
     
-    #  calculate time spent in a search session
+    #  Calculate time spent in a search session
     for term in unique_terms:
-        for key, val in my_dict[term].items():
+        for key, val in query_table[term].items():
             total_time = max(val["end times"]) - val["start time"]
             val["total time"] = total_time
-    return my_dict
+    return query_table
 
 
 def aggregated_dictionary(compiled_dict: Dict[str, Dict[str, Any]],
                           unique_terms: List[str]) -> Dict[str, Dict[str, Any]]:
     """Aggregate search query data and place into new dictionary."""
 
-    my_dict_agg = {query: { "results clicked": 0,
+    summary_table = {query: { "results clicked": 0,
                             "num users": 0,
                             "total time": 0} 
                             for query in unique_terms}
@@ -203,17 +202,17 @@ def aggregated_dictionary(compiled_dict: Dict[str, Dict[str, Any]],
                 total_time += val["total time"]
                 total_time_all += total_time
                 total_clicks_all += num_clicks_sum
-                my_dict_agg[term][
+                summary_table[term][
                     "results clicked"] += num_clicks_sum  
-                my_dict_agg[term]["num users"] = num_users
-                my_dict_agg[term][
+                summary_table[term]["num users"] = num_users
+                summary_table[term][
                     "total time"] += total_time   
-                my_dict_agg[term][
+                summary_table[term][
                     "av clicks per user"] = num_clicks_sum / num_users
-                my_dict_agg[term][
+                summary_table[term][
                     "av time per click"] = total_time / num_clicks_sum
 
-    return my_dict_agg, total_time_all, total_clicks_all
+    return summary_table, total_time_all, total_clicks_all
  
 
 def write_data_to_csv(compiled_dict: Dict[str, Dict[str, Any]],
@@ -236,23 +235,23 @@ def write_data_to_csv(compiled_dict: Dict[str, Dict[str, Any]],
     output_filename = 'aggregated-page-views.csv'
     write_to_csv(output_filename=output_filename,
                  output_folder=processed_folder,
-                 output=output)  
+                 output=output)
 
-def find_top_results(dictionary: Dict[str, Dict[str, Any]], 
-                     num_results: int, 
-                     result_key: str, 
+def find_top_results(dictionary: Dict[str, Dict[str, Any]],
+                     num_results: int,
+                     result_key: str,
                      reverse: bool = True) -> List[Tuple[str, int]]:
     """Create an ordered dictionary sorted by a user-defined key 
     and return the top N results in descending order."""
 
     most_freq_queries = []
-    result = OrderedDict(sorted(dictionary.items(), 
+    result = OrderedDict(sorted(dictionary.items(),
                                 key = lambda x: getitem(x[1], result_key), 
                                 reverse=reverse))
     top_queries = list(result.keys())[:num_results]
     for query in top_queries:
         result_val = result[query][result_key]
-        most_freq_queries.append((query, result_val))   
+        most_freq_queries.append((query, result_val))
 
     return most_freq_queries
 
@@ -271,35 +270,41 @@ def main(input_filename: str = None):
 
     RETURNS
     -------
-        None 
+        None
     """
 
     csv_file = retrive_csv_file(filename=input_filename,
                                 input_folder=input_folder)
+
     page_views_data = validate_data(csv_file, 
                                    header=False,
                                    output_filename=None,
                                    output_folder=None)
+
     terms, unique_terms = find_unique_attributes(page_views_data, 1)
     print("There are {} unique search keywords out of {}.".format(len(unique_terms), len(terms))) 
+    
     cids, unique_cids = find_unique_attributes(page_views_data, 3, path=False)
     print("There are {} unique client ids out of {}.".format(len(unique_cids), len(cids))) 
-    my_dict =  create_dictionary(page_views_data, unique_terms)
-    my_dict_agg, total_time_all, total_clicks_all = aggregated_dictionary(
-        my_dict, unique_terms)
-    write_data_to_csv(my_dict_agg, output_folder)
+    
+    query_table =  create_dictionary(page_views_data, unique_terms)
+    
+    summary_table, total_time_all, total_clicks_all = aggregated_dictionary(
+        query_table, unique_terms)
+    
+    write_data_to_csv(summary_table, output_folder)
 
-    # Q1: find top issued queries
+    #  Find top issued queries
     count_queries = Counter(terms)
-    top_queries = count_queries.most_common(num_issued_queries)
-    print("The top {} most issued queries are: {}".format(num_issued_queries, top_queries))
+    top_queries = count_queries.most_common(N)
+    print("The top {} most issued queries are: {}".format(N, top_queries))
 
-    # Q2: find top queires by search result clicks
-    most_freq_queries = find_top_results(my_dict_agg, top_clicked, "results clicked")   
-    print("The top {} queries in terms of total number of search results clicked: {}".format(top_clicked, 
+    #  Find top queires by search result clicks
+    most_freq_queries = find_top_results(summary_table, N, "results clicked")   
+    print("The top {} queries in terms of total number of search results clicked: {}".format(N, 
         most_freq_queries))
 
-    # Q3: average length of a search session
+    #  Average length of a search session
     average_search_session = total_time_all / total_clicks_all
     print("The average length of a search session is {:.2f} seconds".format(
         average_search_session))
@@ -310,8 +315,7 @@ if __name__ == "__main__":
     output_folder = "../output/"
 
     #  specify top results to display
-    num_issued_queries = 5
-    top_clicked = 5
+    N = 5
     # sys.argv[1]
     main(input_filename='page-views.csv')
 
