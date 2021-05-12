@@ -42,6 +42,7 @@ def retrive_csv_file(filename=None, input_folder=None):
         #  Neither a filename nor a folder was provided
         else:
             files = glob.glob("./*.csv")
+            print(files)
             csv_file = max(files)
 
     #  Check if this is a valid file
