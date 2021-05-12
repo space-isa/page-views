@@ -100,12 +100,12 @@ class TestAggregatedData(unittest.TestCase):
     """
     METHODS
     -------
-        test_aggregatedDict : Calculate the correct number of tracts
-                                 from population data. 
+        test_aggregatedDict : Calculate the correct averages and 
+                               totals from query data. 
     """
 
     def test_aggregatedDict(self):
-        """Validate method for determining number of census tracts."""
+        """Validate method for determining query averages and totals."""
 
         unique_terms = ['millyrock']
         start = 1496253932
